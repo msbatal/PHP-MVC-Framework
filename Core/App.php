@@ -94,7 +94,7 @@ class App
         }
         switch ($type) {
             case 'string' :
-                $result = filter_input(INPUT_POST | INPUT_GET, $content, FILTER_SANITIZE_STRING);
+                $result = filter_input(INPUT_POST | INPUT_GET, $content, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             break;
             case 'integer' :
                 $result = filter_input(INPUT_POST | INPUT_GET, $content, FILTER_SANITIZE_NUMBER_INT);
@@ -127,7 +127,7 @@ class App
         }
         switch ($type) {
             case 'string' :
-                $result = filter_var($content, FILTER_SANITIZE_STRING);
+                $result = filter_var($content, FILTER_SANITIZE_FULL_SPECIAL_CHARS);
             break;
             case 'integer' :
                 $result = filter_var($content, FILTER_SANITIZE_NUMBER_INT);
