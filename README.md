@@ -18,9 +18,9 @@ Sunhill Framework is a simple, fast, and powerful PHP App Development Framework 
 
 ### Installation
 
-1. First, download all files and directories (except Examples directory).
-2. Open System/Config.php and edit your database, cache, and system settings.
-3. Create Controllers, views and models.
+1. Download all files and directories (except Examples directory).
+2. Open `System/Config.php` and edit your database, cache, and system settings.
+3. Create your controllers, views and models.
 
 See below for more details.
 
