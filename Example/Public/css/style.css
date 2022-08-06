@@ -1,0 +1,85 @@
+a:active, button:active, img:active,
+input:focus, input:active,
+select:active, select:focus,
+textarea:active, textarea:focus {
+    outline:0!important;
+    outline:none!important;
+    outline-color:transparent!important;
+    outline-style:none!important;
+    box-shadow:none!important;
+}
+.navbar-brand img {
+    height:60px;
+    max-width:100%;
+}
+.navbar-toggler {
+    border: 1px solid #333;
+    background: #30424f;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    box-shadow:none!important;
+}
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke='rgba(255, 200, 0, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg>");
+}
+.nav-link {
+    color: #30424e;
+    font-weight: bold;
+}
+.nav-link:hover {
+    color: #b11925;
+}
+header {
+    border-bottom: 1px solid #e5e5e5;
+}
+#logo {
+    text-align: left;
+}
+#nav {
+    text-align: right;
+}
+main {
+    min-height: 600px;
+    margin: 30px 0;
+}
+.error {
+    margin-top: 70px;
+}
+.error img {
+    height: 200px;
+    max-width: 100%;
+}
+footer {
+    background-color: #f5f5f5;
+    border-top: 1px solid #e5e5e5;
+    padding: 20px 0;
+    font-size: .9em;
+}
+footer a {
+    color: #000;
+    text-decoration: none;
+}
+@media (min-width:992px) {
+    .navbar-expand-lg .navbar-nav .nav-link {
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+}
+@media (max-width:991px) {
+    .navbar-nav {
+        border-top: 1px solid #ccc;
+        font-size: 1rem;
+        text-align: center;
+        margin-top: 15px;
+        padding-top: 15px;
+    }
+}
+@media (max-width:768px) {
+    #logo {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    #nav {
+        text-align: center;
+    }
+}
