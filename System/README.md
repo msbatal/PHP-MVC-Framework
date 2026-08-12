@@ -4,7 +4,7 @@ Two kinds of files here, treated very differently:
 
 - **`Config.php`, `Functions.php`** - this framework's own settings and
   helper functions. Edit freely.
-- **`Sun*.php` (9 files)** - general-purpose, framework-agnostic PHP
+- **`Sun*.php` (10 files)** - general-purpose, framework-agnostic PHP
   classes maintained *outside* this project and dropped in as-is. **Never
   hand-edit these.** If you need different behavior, either configure it
   (most of them take a constructor/config array) or wrap it in your own
@@ -91,6 +91,7 @@ framework. That's a design constraint, not an oversight - see below.
 | `SunCaptcha` | Generates/validates an image CAPTCHA. |
 | `SunSitemap` | Builds `sitemap.xml`/`sitemap-index.xml`/`robots.txt`. |
 | `SunFunc` | CSRF tokens, encryption/decryption, IP lookup, `.env` loading, misc URL helpers. Instantiated in `init.php` as `$functions`. |
+| `SunQRCode` | Generates QR codes as SVG or PNG images from a URL or text payload.|
 
 ### SunAuth - the one you'll use most
 
@@ -185,6 +186,47 @@ Reads `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS`/`SMTP_PORT`/`SMTP_SECURE`/
 `SMTP_FROM_NAME` from `.env`. `send()` never throws - logs to
 `php_error.log` and returns `false` on failure, so a missing/broken SMTP
 config degrades to "email silently didn't send," not a crashed request.
+
+### SunQRCode
+
+```php
+$qr = new SunQRCode();
+$qr->setData('https://sunhillint.com') // URL or text payload to encode
+   ->setSize(500) // output dimension in px, between 50 and 1000
+   ->setFormat('png') // 'svg' or 'png'
+   ->setForegroundColor('1a73e8') // HEX color, with or without '#'
+   ->setBackgroundColor('#ffffff') // HEX color, with or without '#'
+   ->setErrorCorrection('H') // 'L', 'M', 'Q' or 'H'
+   ->setTimeout(15); // cURL timeout in seconds, default 10
+```
+`setSize()`, `setFormat()`, `setForegroundColor()`, `setBackgroundColor()` and `setErrorCorrection()` validate their input and throw an `Exception` if it's out of range or not one of the allowed values, so bad values never reach the request.
+
+```php
+$qr = new SunQRCode('https://sunhillint.com');
+$data = $qr->generate();
+//Returns the raw SVG markup (string) or PNG binary data, fetched from the QR service
+```
+
+Use this when you want to handle the raw output yourself, e.g. store it in a database or embed the SVG markup directly into a page.
+
+```php
+$qr = new SunQRCode('https://sunhillint.com');
+$qr->setFormat('png')->render();
+//Sends the correct Content-Type header (image/svg+xml or image/png), echoes the image, and exits
+```
+
+Call this from a script that is meant to output nothing but the image itself (e.g. an `<img src="qr.php?...">` endpoint).
+
+```php
+$qr = new SunQRCode('https://sunhillint.com');
+$saved = $qr->setFormat('png')->saveToFile('qrcodes/sunhillint.png');
+
+if ($saved) {
+    echo 'QR code saved successfully!';
+}
+```
+
+Returns `true` on success, or throws an `Exception` if the file path is invalid or not writable.
 
 ### SunCache - full-page caching
 
