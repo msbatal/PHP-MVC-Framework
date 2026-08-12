@@ -3,10 +3,9 @@
 /**
  * This file is part of the Sunhill Framework package.
  *
- * (c) Mehmet Selcuk Batal, Sunhill Technology <batalms@gmail.com>
+ * (c) Sunhill Technology <info@sunhillint.com>
  *
- * Licensed under The GNU Lesser General Public License, version 3.0
- * Redistributions of files must retain the above copyright notice.
+ * Licensed under The GNU Lesser General Public License, version 3.0. Redistributions of files must retain the above copyright notice.
  */
 
 /**
@@ -25,7 +24,7 @@ class Home extends \Core\Controller
     /**
      * Construct method of the inherited controller
      * Don't change the parameters if not needed
-     * 
+     *
      * @param string $view
      * @param object $model
      * @param array $params
@@ -39,13 +38,12 @@ class Home extends \Core\Controller
     /**
      * Main method of the controller
      * Don't change the method's name
-     * If this page is called by a browser without method parameter, this will work first
+     * If this page is called by a browser without a method parameter, this
+     * runs first - SYS_HOMEPAGE ('home') + Core\App::parseUrl()'s empty-page
+     * fallback both route here.
      */
     public function show() {
-        // if this page needs database, call model class' show method here
-        // for details, see the description and/or example files (test directory)
-
-        require_once ($this->view); // include view file (with $result content)
+        require_once ($this->view); // include view file
     }
 
     /**

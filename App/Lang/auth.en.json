@@ -1,0 +1,54 @@
+{
+  "auth.email_label": "Email",
+  "auth.password_label": "Password",
+  "auth.confirm_password_label": "Confirm Password",
+  "auth.verification_code_label": "Verification Code",
+  "auth.password_mismatch": "Passwords do not match.",
+
+  "login.title": "Log In",
+  "login.error": "Invalid email or password.",
+  "login.submit": "Log In",
+  "login.forgot_link": "Forgot password?",
+  "login.no_account": "Don't have an account?",
+  "login.signup_link": "Sign Up",
+
+  "register.title": "Sign Up",
+  "register.error_exists": "An account with this email already exists. Try logging in instead.",
+  "register.error_generic": "Please enter a valid email and a password of at least 8 characters.",
+  "register.first_name_label": "First Name",
+  "register.last_name_label": "Last Name",
+  "register.submit": "Create Account",
+  "register.have_account": "Already have an account?",
+  "register.login_link": "Log In",
+
+  "verifyemail.title": "Verify Your Email",
+  "verifyemail.subtitle": "We sent a 6-digit code to your email. Enter it below to activate your account.",
+  "verifyemail.error": "Invalid or expired code. Please try again.",
+  "verifyemail.resent": "A new code has been sent to your email.",
+  "verifyemail.submit": "Verify Email",
+  "verifyemail.resend_button": "Resend code",
+
+  "forgotpassword.title": "Forgot Password",
+  "forgotpassword.subtitle": "Enter your email and we'll send you a link to reset your password.",
+  "forgotpassword.submit": "Send Reset Link",
+  "forgotpassword.back_link": "Back to Log In",
+
+  "resetpassword.title": "Reset Password",
+  "resetpassword.invalid": "This reset link is invalid or has expired.",
+  "resetpassword.request_new_link": "Request a new link",
+  "resetpassword.subtitle": "Choose a new password below.",
+  "resetpassword.error_generic": "Something went wrong. Please try again.",
+  "resetpassword.new_password_label": "New Password",
+  "resetpassword.submit": "Reset Password",
+
+  "verify2fa.title": "Two-Factor Verification",
+  "verify2fa.subtitle": "Enter the 6-digit code from your authenticator app.",
+  "verify2fa.error": "Invalid code. Please try again.",
+  "verify2fa.submit": "Verify",
+
+  "auth.flash_welcome_back": "Welcome back!",
+  "auth.flash_email_verified": "Email verified! Please log in.",
+  "auth.flash_reset_link_sent": "If that email is registered, we've sent a password reset link.",
+  "auth.flash_password_reset": "Password reset. Please log in with your new password.",
+  "auth.flash_logged_out": "You've been logged out."
+}

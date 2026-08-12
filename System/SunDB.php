@@ -9,10 +9,8 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-PDO-Database-Class
- * @version   2.3.0
+ * @version   3.3.1
  */
-
-namespace System;
 
 class SunDB
 {
@@ -28,7 +26,7 @@ class SunDB
         'dbname' => null,
         'username' => null,
         'password' => null,
-        'charset' => 'utf8'
+        'charset' => 'utf8mb4'
     ];
 
     /**
@@ -38,22 +36,22 @@ class SunDB
     private $pdo;
 
     /**
-     * Type of returned result
-     * @var string
+     * Static instance of self
+     * @var object
      */
-    private $returnType = \PDO::FETCH_ASSOC;
+    private static $instance;
 
     /**
      * Dynamic table control (on/off)
      * @var boolean
      */
-    private $checkTable = true;
+    private $checkTable = false;
 
     /**
      * Dynamic column control (on/off)
      * @var boolean
      */
-    private $checkColumn = true;
+    private $checkColumn = false;
 
     /**
      * SQL query
@@ -62,13 +60,25 @@ class SunDB
     private $query;
 
     /**
+     * Array that holds query result
+     * @var array
+     */
+    private $queryResult;
+
+    /**
      * Action for query string
      * @var string
      */
     private $action;
 
     /**
-     * table name
+     * Record order to be selected
+     * @var string
+     */
+    private $which;
+
+    /**
+     * Table name
      * @var string
      */
     private $table;
@@ -110,6 +120,12 @@ class SunDB
     private $having;
 
     /**
+     * Array that holds Join clauses
+     * @var array
+     */
+    private $joins = [];
+
+    /**
      * Dynamic type list for Order By condition value
      * @var array
      */
@@ -134,6 +150,12 @@ class SunDB
     private $rowCount = 0;
 
     /**
+     * Total row count from the last paginate() call
+     * @var integer
+     */
+    private $totalCount = 0;
+
+    /**
      * @param string|array|object $type
      * @param string $host
      * @param string $username
@@ -143,9 +165,6 @@ class SunDB
      * @param string $charset
      */
     public function __construct($type = null, $host = null, $username = null, $password = null, $dbname = null, $port = null, $charset = null) {
-        set_exception_handler(function($exception) {
-            echo '<b>[SunDB] Exception:</b> '.$exception->getMessage();
-        });
         if (is_array($type)) { // connect to db using parameters in the array
             $this->connectionParams = $type;
         } else if (is_object($type)) { // connect to db using pdo object
@@ -157,13 +176,7 @@ class SunDB
                 }
             }
         }
-    }
-
-    /**
-     * Close PDO connection
-     */
-    public function __destruct() {
-        $this->pdo = null;
+        self::$instance = $this;
     }
 
     /**
@@ -174,31 +187,39 @@ class SunDB
      */
     private function connect() {
         if (empty($this->connectionParams['driver'])) {
-            throw new \Exception('Database Driver is not set.');
+            throw new Exception('Database Driver is not set.');
         }
-        if ($this->connectionParams['driver'] == "sqlite") {
+        if ($this->connectionParams['driver'] == 'sqlite') {
             $connectionString = 'sqlite:' . $this->connectionParams['url'];
-            $this->pdo = new \PDO($connectionString);
-
-        } else if ($this->connectionParams['driver'] == "mssql") {
-            $connectionString = 'sqlsrv:Server='.$this->connectionParams['host'].';Database='.$this->connectionParams['dbname'];
-            $this->pdo = new \PDO($connectionString, $this->connectionParams['username'], $this->connectionParams['password']);
+            $this->pdo = new PDO($connectionString);
+        } else if ($this->connectionParams['driver'] == 'mssql') {
+            $connectionString = 'sqlsrv:Server=' . $this->connectionParams['host'] . ';Database=' . $this->connectionParams['dbname'];
+            $this->pdo = new PDO($connectionString, $this->connectionParams['username'], $this->connectionParams['password']);
         } else {
-            $connectionString = $this->connectionParams['driver'].':';
+            $connectionString = $this->connectionParams['driver'] . ':';
             $connectionParams = ['host', 'dbname', 'port', 'charset'];
             foreach ($connectionParams as $connectionParam) {
                 if (!empty($this->connectionParams[$connectionParam])) {
-                    $connectionString .= $connectionParam.'='.$this->connectionParams[$connectionParam].';';
+                    $connectionString .= $connectionParam . '=' . $this->connectionParams[$connectionParam] . ';';
                 }
             }
             $connectionString = rtrim($connectionString, ';');
-            $this->pdo = new \PDO($connectionString, $this->connectionParams['username'], $this->connectionParams['password']);
+            $this->pdo = new PDO($connectionString, $this->connectionParams['username'], $this->connectionParams['password']);
         }
-        $this->pdo->setAttribute(\PDO::ATTR_EMULATE_PREPARES, false);
-        $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-        $this->pdo->setAttribute(\PDO::ATTR_DEFAULT_FETCH_MODE, $this->returnType);
-        if (!($this->pdo instanceof \PDO)) {
-            throw new \Exception('This object is not an instance of PDO.');
+        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $this->pdo->setAttribute(PDO::ATTR_CURSOR, PDO::CURSOR_SCROLL);
+        $this->pdo->setAttribute(PDO::ATTR_ORACLE_NULLS, PDO::NULL_EMPTY_STRING);
+        $this->pdo->setAttribute(PDO::ATTR_PERSISTENT, false);
+        $this->pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        if ($this->connectionParams['driver'] == 'mysql') {
+          $this->pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+          $this->pdo->setAttribute(PDO::MYSQL_ATTR_FOUND_ROWS, true);
+          $charset = !empty($this->connectionParams['charset']) ? $this->connectionParams['charset'] : 'utf8mb4';
+          $this->pdo->setAttribute(PDO::MYSQL_ATTR_INIT_COMMAND, 'SET CHARACTER SET ' . $charset . ', NAMES ' . $charset);
+        }
+        if (!($this->pdo instanceof PDO)) {
+            throw new Exception('This object is not an instance of PDO.');
         }
     }
 
@@ -212,10 +233,37 @@ class SunDB
         if (!$this->pdo) {
             $this->connect(); // call connection method
         }
-        if (!($this->pdo instanceof \PDO)) {
-            throw new \Exception('This object is not an instance of PDO.');
+        if (!($this->pdo instanceof PDO)) {
+            throw new Exception('This object is not an instance of PDO.');
         }
         return $this->pdo;
+    }
+
+    /**
+     * Start a transaction
+     *
+     * @return boolean
+     */
+    public function beginTransaction() {
+        return $this->pdo()->beginTransaction();
+    }
+
+    /**
+     * Commit a transaction
+     *
+     * @return boolean
+     */
+    public function commit() {
+        return $this->pdo()->commit();
+    }
+
+    /**
+     * Roll back a transaction
+     *
+     * @return boolean
+     */
+    public function rollback() {
+        return $this->pdo()->rollBack();
     }
 
     /**
@@ -224,8 +272,10 @@ class SunDB
     private function reset() {
         $this->query        = '';
         $this->action       = '';
+        $this->which        = '';
         $this->table        = '';
         $this->values       = [];
+        $this->joins        = [];
         $this->where        = [];
         $this->orWhere      = [];
         $this->whereValues  = [];
@@ -235,6 +285,42 @@ class SunDB
         $this->limit        = '';
         $this->lastInsertId = 0;
         $this->rowCount     = 0;
+        $this->totalCount   = 0;
+    }
+
+    /**
+     * Validate a table/column identifier
+     *
+     * @param string $name
+     * @throws exception
+     * @return string
+     */
+    private function validateIdentifier($name = null) {
+        if (!is_string($name) || !preg_match('/^[a-zA-Z0-9_]+$/', $name)) {
+            throw new Exception('Invalid table/column identifier: "' . $name . '".');
+        }
+        return $name;
+    }
+
+    /**
+     * Validate a "table.column" or "column" reference, quoted and ready for the query
+     *
+     * @param string $name
+     * @throws exception
+     * @return string
+     */
+    private function validateColumnRef($name = null) {
+        if (!is_string($name) || $name === '') {
+            throw new Exception('Invalid column reference.');
+        }
+        $parts = explode('.', $name);
+        if (count($parts) > 2) {
+            throw new Exception('Invalid column reference: "' . $name . '".');
+        }
+        foreach ($parts as $part) {
+            $this->validateIdentifier($part);
+        }
+        return implode('.', array_map(function ($part) { return '`' . $part . '`'; }, $parts));
     }
 
     /**
@@ -245,9 +331,10 @@ class SunDB
      * @return boolean
      */
     private function checkTable($table = null) {
-        $result = $this->pdo()->query("SHOW TABLES LIKE '".$table."'");
+        $result = $this->pdo()->prepare("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?");
+        $result->execute([$this->connectionParams['dbname'], $table]);
         if ($result->rowCount() != 1) {
-            throw new \Exception('Table "'.$table.'" does not exist.');
+            throw new Exception('Table "' . $table . '" does not exist.');
         }
     }
 
@@ -259,9 +346,10 @@ class SunDB
      * @return boolean
      */
     private function checkColumn($column = null) {
-        $result = $this->pdo()->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '".$this->connectionParams['dbname']."' AND TABLE_NAME = '".$this->table."' AND COLUMN_NAME = '".$column."'");
+        $result = $this->pdo()->prepare("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+        $result->execute([$this->connectionParams['dbname'], $this->table, $column]);
         if ($result->rowCount() != 1) {
-            throw new \Exception('Column "'.$column.'" does not exist.');
+            throw new Exception('Column "' . $column . '" does not exist.');
         }
     }
 
@@ -274,7 +362,8 @@ class SunDB
      */
     public function select($table = null, $columns = '*') {
         $this->reset();
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkTable) {
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
             $this->checkTable($table);
         }
         if (is_array($columns) && count($columns) > 0) {
@@ -284,7 +373,7 @@ class SunDB
         }
         $this->table = $table;
         $this->action = 'select';
-        $this->query = 'select '.$columns.' from `'.$table.'`';
+        $this->query = 'select ' . $columns . ' from `' . $table . '`';
         return $this;
     }
     
@@ -298,23 +387,71 @@ class SunDB
      */
     public function insert($table = null, $data = []) {
         $this->reset();
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkTable) {
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
             $this->checkTable($table);
         }
         if (!is_array($data) || count($data) <= 0) {
-            throw new \Exception('Insert clause must contain an array data.');
+            throw new Exception('Insert clause must contain an array data.');
         }
+        $sequential = array_keys($data) === range(0, count($data) - 1); // values only, no column names
+        $keys = [];
+        $alias = [];
         foreach ($data as $key => $value) {
-            $keys[] = '`'.$key.'`';
-            $alias[] = "?";
-            if (empty($value)) {$value = '';}
+            if (!$sequential) {
+                $keys[] = '`' . $this->validateIdentifier($key) . '`';
+            }
+            $alias[] = '?';
+            if ($value == '' && $value <> '0') {$value = NULL;}
             $this->values[] = $value;
         }
-        $keys = implode(',', $keys);
-        $alias = implode(',', $alias);
+        $strAlias = implode(',', $alias);
         $this->table = $table;
         $this->action = 'insert';
-        $this->query = 'insert into `'.$table.'` ('.$keys.') values ('.$alias.')';
+        if ($sequential) {
+            $this->query = 'insert into `' . $table . '` values (' . $strAlias . ')';
+        } else {
+            $this->query = 'insert into `' . $table . '` (' . implode(',', $keys) . ') values (' . $strAlias . ')';
+        }
+        return $this;
+    }
+
+    /**
+     * Build a bulk INSERT part of the query (multiple rows in one statement)
+     *
+     * @param string $table
+     * @param array $rows
+     * @throws exception
+     * @return object
+     */
+    public function insertMany($table = null, $rows = []) {
+        $this->reset();
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
+            $this->checkTable($table);
+        }
+        if (!is_array($rows) || count($rows) <= 0) {
+            throw new Exception('Insert Many clause must contain an array of rows.');
+        }
+        $columns = array_keys(reset($rows));
+        foreach ($columns as $column) {
+            $this->validateIdentifier($column);
+        }
+        $strKeys = implode(',', array_map(function ($column) { return '`' . $column . '`'; }, $columns));
+        $rowPlaceholders = [];
+        foreach ($rows as $row) {
+            $placeholders = [];
+            foreach ($columns as $column) {
+                $value = isset($row[$column]) ? $row[$column] : null;
+                if ($value === '') {$value = NULL;}
+                $this->values[] = $value;
+                $placeholders[] = '?';
+            }
+            $rowPlaceholders[] = '(' . implode(',', $placeholders) . ')';
+        }
+        $this->table = $table;
+        $this->action = 'insert';
+        $this->query = 'insert into `' . $table . '` (' . $strKeys . ') values ' . implode(',', $rowPlaceholders);
         return $this;
     }
 
@@ -328,21 +465,21 @@ class SunDB
      */
     public function update($table = null, $data = []) {
         $this->reset();
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkTable) {
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
             $this->checkTable($table);
         }
         if (!is_array($data) || count($data) <= 0) {
-            throw new \Exception('Update clause must contain an array data.');
+            throw new Exception('Update clause must contain an array data.');
         }
         foreach ($data as $key => $value) {
-            $keys[] = '`'.$key.'`=?';
-            if (empty($value)) {$value = '';}
+            $keys[] = '`' . $this->validateIdentifier($key) . '`=?';
             $this->values[] = $value;
         }
         $keys = implode(',', $keys);
         $this->table = $table;
         $this->action = 'update';
-        $this->query = 'update `'.$table.'` set '.$keys;
+        $this->query = 'update `' . $table . '` set ' . $keys;
         return $this;
     }
 
@@ -354,12 +491,13 @@ class SunDB
      */
     public function delete($table = null) {
         $this->reset();
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkTable) {
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
             $this->checkTable($table);
         }
         $this->table = $table;
         $this->action = 'delete';
-        $this->query = 'delete from `'.$table.'`';
+        $this->query = 'delete from `' . $table . '`';
         return $this;
     }
 
@@ -375,31 +513,43 @@ class SunDB
      */
     public function where($column = null, $value = null, $operator = null, $condition = 'and') {
         if (empty($value) && empty($operator)) {
-            $this->where[] = $condition.' '.$column;
+            $this->where[] = $condition . ' (' . $column . ') ';
         } else {
             if (empty($column) || empty($operator)) {
-                throw new \Exception('Where clause must contain a value and operator.');
+                throw new Exception('Where clause must contain a value and operator.');
             }
-            if ($this->connectionParams['driver'] != "sqlite" && $this->checkColumn) {
-                $this->checkColumn($column);
+            $operator = strtolower(trim($operator)); // accept 'LIKE', 'In', etc. the same as their lowercase form
+            $allowedOperators = ['=', '!=', '<>', '<', '>', '<=', '>=', 'like', 'not like', 'between', 'not between', 'in', 'not in'];
+            if (!in_array($operator, $allowedOperators, true)) {
+                throw new Exception('Where operator "' . $operator . '" is not allowed.');
             }
-            if ($operator == "between" || $operator == "not between") {
+            $columnParts = explode('.', $column); // unqualified part for checkColumn()
+            $columnName = end($columnParts);
+            $column = $this->validateColumnRef($column);
+            if ($this->connectionParams['driver'] != 'sqlite' && $this->checkColumn) {
+                $this->checkColumn($columnName);
+            }
+            if ($operator == 'like' || $operator == 'not like') {
+                $this->where[] = $condition . ' (' . $column . ' ' . $operator . ' ?) ';
+                if ($value === NULL) {$value = '';}
+                $this->whereValues[] = $value;
+            } else if ($operator == 'between' || $operator == 'not between') {
                 if (!empty($value[0]) && !empty($value[1])) {
                     $this->whereValues[] = $value[0];
                     $this->whereValues[] = $value[1];
-                    $this->where[] = $condition.' (`'.$column.'` '.$operator.' ? and ?)';
+                    $this->where[] = $condition . ' (' . $column . ' ' . $operator . ' ? and ?) ';
                 }
-            } else if ($operator == "in" || $operator == "not in") {
+            } else if ($operator == 'in' || $operator == 'not in') {
                 if (is_array($value) && count($value)>0) {
                     foreach ($value as $val) {
                         $values[] = '?';
                         $this->whereValues[] = $val;
                     }
-                    $this->where[] = $condition.' (`'.$column.'` '.$operator.' ('.implode(',', $values).'))';
+                    $this->where[] = $condition . ' (' . $column . ' ' . $operator . ' (' . implode(',', $values) . ')) ';
                 }
             } else {
-                $this->where[] = $condition.' (`'.$column.'`'.$operator.'?) ';
-                if (empty($value)) {$value = '';}
+                $this->where[] = $condition . ' (' . $column . ' ' . $operator . '?) ';
+                if ($value === NULL) {$value = '';}
                 $this->whereValues[] = $value;
             }
         }
@@ -420,20 +570,199 @@ class SunDB
     }
 
     /**
+     * Build a parenthesized group of conditions inside the WHERE clause
+     *
+     * @param callable $callback
+     * @param string $condition
+     * @throws exception
+     * @return object
+     */
+    public function whereGroup($callback = null, $condition = 'and') {
+        if (!is_callable($callback)) {
+            throw new Exception('Where Group clause must contain a callable.');
+        }
+        $outerWhere = $this->where; // pause the outer conditions being built
+        $outerWhereValues = $this->whereValues;
+        $this->where = [];
+        $this->whereValues = [];
+
+        $callback($this); // fills the paused-empty arrays above via the normal where()/orWhere()
+
+        $groupWhere = $this->where;
+        $groupValues = $this->whereValues;
+        $this->where = $outerWhere; // resume the outer conditions
+        $this->whereValues = $outerWhereValues;
+
+        $count = 0;
+        $clean = [];
+        foreach ($groupWhere as $fragment) { // strip the group's own leading and/or, same as run() does for the outer query
+            $count++;
+            $clean[] = $count == 1 ? ltrim(ltrim($fragment, 'or'), 'and') : $fragment;
+        }
+        $sql = implode('', $clean);
+        if ($sql === '') {
+            return $this; // callback added nothing (e.g. an empty "in" array) - skip, don't emit "and ()"
+        }
+        $this->where[] = $condition . ' (' . $sql . ') ';
+        $this->whereValues = array_merge($this->whereValues, $groupValues);
+        return $this;
+    }
+
+    /**
+     * Shortcut for whereGroup(..., 'or')
+     *
+     * @param callable $callback
+     * @throws exception
+     * @return object
+     */
+    public function orWhereGroup($callback = null) {
+        return $this->whereGroup($callback, 'or');
+    }
+
+    /**
+     * Add a "column IS NULL" condition
+     *
+     * @param string $column
+     * @param string $condition
+     * @throws exception
+     * @return object
+     */
+    public function whereNull($column = null, $condition = 'and') {
+        $columnParts = explode('.', $column);
+        $columnName = end($columnParts);
+        $column = $this->validateColumnRef($column);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkColumn) {
+            $this->checkColumn($columnName);
+        }
+        $this->where[] = $condition . ' (' . $column . ' is null) ';
+        return $this;
+    }
+
+    /**
+     * Add a "column IS NOT NULL" condition
+     *
+     * @param string $column
+     * @param string $condition
+     * @throws exception
+     * @return object
+     */
+    public function whereNotNull($column = null, $condition = 'and') {
+        $columnParts = explode('.', $column);
+        $columnName = end($columnParts);
+        $column = $this->validateColumnRef($column);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkColumn) {
+            $this->checkColumn($columnName);
+        }
+        $this->where[] = $condition . ' (' . $column . ' is not null) ';
+        return $this;
+    }
+
+    /**
+     * Add a raw SQL WHERE
+     *
+     * @param string $sql
+     * @param string $condition
+     * @return object
+     */
+    public function whereRaw($sql = null, $condition = 'and') {
+        $this->where[] = $condition . ' (' . $sql . ') ';
+        return $this;
+    }
+
+    /**
+     * Build a JOIN part of the query
+     *
+     * @param string $table
+     * @param string $firstColumn
+     * @param string $operator
+     * @param string $secondColumn
+     * @param string $type
+     * @throws exception
+     * @return object
+     */
+    public function join($table = null, $firstColumn = null, $operator = '=', $secondColumn = null, $type = 'inner') {
+        if (empty($table) || empty($firstColumn) || empty($secondColumn)) {
+            throw new Exception('Join clause must contain a table and two columns to compare.');
+        }
+        if (!in_array($operator, ['=', '!=', '<>', '<', '>', '<=', '>='], true)) {
+            throw new Exception('Join operator "' . $operator . '" is not allowed.');
+        }
+        $type = strtoupper($type);
+        if (!in_array($type, ['INNER', 'LEFT', 'RIGHT', 'FULL'], true)) {
+            throw new Exception('Join type must be one of: inner, left, right, full.');
+        }
+        $table = $this->validateIdentifier($table);
+        $this->joins[] = $type . ' JOIN `' . $table . '` ON ' . $this->validateColumnRef($firstColumn) . ' ' . $operator . ' ' . $this->validateColumnRef($secondColumn);
+        return $this;
+    }
+
+    /**
+     * Shortcut for join(..., 'left')
+     *
+     * @param string $table
+     * @param string $firstColumn
+     * @param string $operator
+     * @param string $secondColumn
+     * @throws exception
+     * @return object
+     */
+    public function leftJoin($table = null, $firstColumn = null, $operator = '=', $secondColumn = null) {
+        return $this->join($table, $firstColumn, $operator, $secondColumn, 'left');
+    }
+
+    /**
+     * Shortcut for join(..., 'right')
+     *
+     * @param string $table
+     * @param string $firstColumn
+     * @param string $operator
+     * @param string $secondColumn
+     * @throws exception
+     * @return object
+     */
+    public function rightJoin($table = null, $firstColumn = null, $operator = '=', $secondColumn = null) {
+        return $this->join($table, $firstColumn, $operator, $secondColumn, 'right');
+    }
+
+    /**
+     * Shortcut for join(..., 'inner')
+     *
+     * @param string $table
+     * @param string $firstColumn
+     * @param string $operator
+     * @param string $secondColumn
+     * @throws exception
+     * @return object
+     */
+    public function innerJoin($table = null, $firstColumn = null, $operator = '=', $secondColumn = null) {
+        return $this->join($table, $firstColumn, $operator, $secondColumn, 'inner');
+    }
+
+    /**
      * Build the GROUP BY part of the WHERE statement
      *
      * @param string $column
      * @throws exception
      * @return object
      */
-    public function groupBy($column = null) {
+    public function groupBy($column = null, $function = null) {
         if (empty($column)) {
-            throw new \Exception('Group By clause must contain a column name.');
+            throw new Exception('Group By clause must contain a column name.');
         }
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkColumn) {
-            $this->checkColumn($column);
+        $columnParts = explode('.', $column);
+        $columnName = end($columnParts);
+        $column = $this->validateColumnRef($column);
+        if (!empty($function)) {
+            $function = $this->validateIdentifier($function);
         }
-        $this->groupBy = '`'.$column.'`';
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkColumn) {
+            $this->checkColumn($columnName);
+        }
+        if (!empty($function)) {
+            $this->groupBy = $function . '(' . $column . ')';
+        } else {
+            $this->groupBy = $column;
+        }
         return $this;
     }
 
@@ -446,9 +775,9 @@ class SunDB
      */
     public function having($value = null) {
         if (empty($value)) {
-            throw new \Exception('Having clause must contain a value.');
+            throw new Exception('Having clause must contain a value.');
         }
-        if ($this->connectionParams['driver'] != "sqlite") {
+        if ($this->connectionParams['driver'] != 'sqlite') {
             $this->having = $value;
         }
         return $this;
@@ -467,12 +796,15 @@ class SunDB
             $this->orderBy[] = $column;
         } else {
             if (empty($column) || !in_array(strtoupper($order), ['ASC', 'DESC'], true)) {
-                throw new \Exception('Order By clause must contain a column name and order value.');
+                throw new Exception('Order By clause must contain a column name and order value.');
             }
-            if ($this->connectionParams['driver'] != "sqlite" && $this->checkColumn) {
-                $this->checkColumn($column);
+            $columnParts = explode('.', $column);
+            $columnName = end($columnParts);
+            $column = $this->validateColumnRef($column);
+            if ($this->connectionParams['driver'] != 'sqlite' && $this->checkColumn) {
+                $this->checkColumn($columnName);
             }
-            $this->orderBy[] = '`'.$column.'` '.$order;
+            $this->orderBy[] = $column . ' ' . $order;
         }
         return $this;
     }
@@ -485,16 +817,67 @@ class SunDB
      * @throws exception
      * @return object
      */
-    public function limit($start = null, $page = null) {
-        if (empty($start) || !is_int($start)) {
-            throw new \Exception('Limit clause must be 1 or above.');
+    public function limit($start = 0, $page = null) {
+        if (!is_int($start)) {
+            throw new Exception('Limit clause must be 0 or above.');
         }
         if (empty($page) || !is_int($page)) {
-            $page=$start;
-            $start=0;
+            $page = $start;
+            $start = 0;
         }
-        $this->limit = $start.','.$page;
+        $this->limit = $start . ',' . $page;
         return $this;
+    }
+
+    /**
+     * Run a COUNT(*) query
+     *
+     * @return integer
+     */
+    public function count() {
+        $countQuery = 'select count(*) as total from `' . $this->table . '`';
+        if (count($this->joins) > 0) {
+            $countQuery .= ' ' . implode(' ', $this->joins);
+        }
+        if (count($this->where) > 0) {
+            $clnWhere = [];
+            $idx = 0;
+            foreach ($this->where as $value) {
+                $idx++;
+                $clnWhere[] = $idx == 1 ? ltrim(ltrim($value, 'or'), 'and') : $value;
+            }
+            $countQuery .= ' where ' . implode('', $clnWhere);
+        }
+        $query = $this->pdo()->prepare($countQuery);
+        $query->execute($this->whereValues);
+        $this->totalCount = (int) $query->fetch()['total'];
+        $query->closeCursor(); unset($query);
+        return $this->totalCount;
+    }
+
+    /**
+     * Apply pagination
+     *
+     * @param integer $page
+     * @param integer $perPage
+     * @throws exception
+     * @return object
+     */
+    public function paginate($page = 1, $perPage = 15) {
+        if (!is_int($page) || $page < 1 || !is_int($perPage) || $perPage < 1) {
+            throw new Exception('Paginate clause must contain valid page and perPage values.');
+        }
+        $this->count();
+        return $this->limit(($page - 1) * $perPage, $perPage);
+    }
+
+    /**
+     * Return the total row count
+     *
+     * @return integer
+     */
+    public function totalCount() {
+        return (int) $this->totalCount;
     }
 
     /**
@@ -506,9 +889,9 @@ class SunDB
      */
     public function rawQuery($query = null, $values = []) {
         $this->reset();
-        if (is_array($values) && count($values)>0) {
+        if (is_array($values) && count($values) > 0) {
             foreach ($values as $value) {
-                if (empty($value)) {$value = '';}
+                if ($value === NULL) {$value = '';}
                 $this->values[] = $value;
             }
         }
@@ -518,12 +901,66 @@ class SunDB
     }
 
     /**
+     * Return the first record
+     *
+     * @return object
+     */
+    public function first() {
+        $this->which = 'first';
+        return $this;
+    }
+
+    /**
+     * Return the last record
+     *
+     * @return object
+     */
+    public function last() {
+        $this->which = 'last';
+        return $this;
+    }
+
+    /**
+     * Return a random record
+     *
+     * @return object
+     */
+    public function random() {
+        $this->which = 'random';
+        return $this;
+    }
+
+    /**
+     * Return all records
+     *
+     * @return object
+     */
+    public function all() {
+        $this->which = 'all';
+        return $this;
+    }
+
+    /**
+     * Return whether at least one row matches the built query
+     *
+     * @throws exception
+     * @return boolean
+     */
+    public function exists() {
+        $this->limit(0, 1);
+        return !empty($this->run());
+    }
+
+    /**
      * Compile/Execute the SQL query and return the result
      *
      * @throws exception
      * @return array|object|boolean
      */
     public function run() {
+        if (is_array($this->joins) && count($this->joins) > 0) { // add Join clauses (must come before Where)
+            $this->query .= ' ' . implode(' ', $this->joins);
+        }
         if (is_array($this->where) && count($this->where) > 0) { // add Where condition
             $count = 0;
             $clnWhere = array();
@@ -535,61 +972,78 @@ class SunDB
                     $clnWhere[] = $value;
                 }
             }
-            $this->query .= ' where ('.implode(' ', $clnWhere).')';
+            $this->query .= ' where ' . implode('', $clnWhere) . '';
         }
         if (!empty($this->groupBy)) { // add Group By condition
-            $this->query .= ' group by '.$this->groupBy;
+            $this->query .= ' group by ' . $this->groupBy;
         }
         if (!empty($this->groupBy) && !empty($this->having)) { // add Having condition
-            $this->query .= ' having '.$this->having;
+            $this->query .= ' having ' . $this->having;
         }
         if (is_array($this->orderBy) && count($this->orderBy) > 0) { // add Order By condition
-            $this->query .= ' order by '.implode(',', $this->orderBy);
+            $this->query .= ' order by ' . implode(',', $this->orderBy);
         }
         if (!empty($this->limit)) { // add Limit condition
-            $this->query .= ' limit '.$this->limit;
+            $this->query .= ' limit ' . $this->limit;
         }
         switch ($this->action) {
             case 'select': // run Select query and return the result (array|object)
                 $query = $this->pdo()->prepare($this->query);
-                $query->execute($this->whereValues);
+                $result = $query->execute($this->whereValues);
                 $this->queryResult = $query->fetchAll();
-                if ($query->rowCount() > 0) {$this->rowCount = $query->rowCount();} // affected row count
-                return $this->queryResult;
+                $this->rowCount = $query->rowCount(); // selected row count
+                $query->closeCursor(); unset($query);
+                if ($this->which == 'first') {
+                    return isset($this->queryResult[0]) ? $this->queryResult[0] : null; // return only first record (null if empty)
+                } else if ($this->which == 'last') {
+                    return !empty($this->queryResult) ? end($this->queryResult) : null; // return only last record (null if empty)
+                } else if ($this->which == 'random') {
+                    if (empty($this->queryResult)) {
+                        return null; // no record to pick from
+                    }
+                    $index = rand(0, $this->rowCount - 1);
+                    return $this->queryResult[$index]; // return a random record
+                } else {
+                    return $this->queryResult; // return all records
+                }
             break;
             case 'insert': // run Insert query and return the result (bool)
                 $query = $this->pdo()->prepare($this->query);
-                $query->execute($this->values);
-                if ($query->rowCount() > 0) {$this->rowCount = $query->rowCount();} // affected row count
-                if ($this->pdo()->lastInsertId() > 0) {$this->lastInsertId = $this->pdo()->lastInsertId();} // auto increment value
-                return true;
+                $result = $query->execute($this->values);
+                $this->rowCount = $query->rowCount(); // inserted row count
+                $this->lastInsertId = $this->pdo()->lastInsertId(); // auto increment value
+                $query->closeCursor(); unset($query);
+                return $result;
             break;
             case 'update': // run Update query and return the result (bool)
                 $query = $this->pdo()->prepare($this->query);
-                $query->execute(array_merge($this->values,$this->whereValues));
-                if ($query->rowCount() > 0) {$this->rowCount = $query->rowCount();} // affected row count
-                return true;
+                $result = $query->execute(array_merge($this->values,$this->whereValues));
+                $this->rowCount = $query->rowCount(); // updated row count
+                $query->closeCursor(); unset($query);
+                return $result;
             break;
             case 'delete': // run Delete query and return the result (bool)
                 $query = $this->pdo()->prepare($this->query);
-                $query->execute($this->whereValues);
-                if ($query->rowCount() > 0) {$this->rowCount = $query->rowCount();} // affected row count
-                return true;
+                $result = $query->execute($this->whereValues);
+                $this->rowCount = $query->rowCount(); // deleted row count
+                $query->closeCursor(); unset($query);
+                return $result;
             break;
             case 'query': // run Raw query and return the result (bool)
                 $query = $this->pdo()->prepare($this->query);
-                $query->execute($this->values);
-                if ($query->rowCount() > 0) {$this->rowCount = $query->rowCount();} // affected row count
-                $exp = explode(' ', $this->query); // for determine the action
-                if ($exp[0] == "select") {
+                $result = $query->execute($this->values);
+                $this->rowCount = $query->rowCount(); // affected row count
+                if ($query->columnCount() > 0) { // for determine the action
                     $this->queryResult = $query->fetchAll();
+                    $query->closeCursor(); unset($query);
                     return $this->queryResult;
                 } else {
-                    return true;
+                    $query->closeCursor(); unset($query);
+                    return $result;
                 }
             break;
             default:
-                throw new \Exception('Command "'.$this->action.'" is not allowed.');
+                throw new Exception('Command "' . $this->action . '" is not allowed.');
             break;
         }
     }
@@ -597,49 +1051,95 @@ class SunDB
     /**
      * Perform backup the database and print/download backup file
      *
-     * @param string $file
-     * @param string $type
+     * @param string $fileName
+     * @param string $action
+     * @param array $excludeTables
      * @throws exception
      * @return string|file
      */
-    public function backup($file = null, $type = null) {
-        if ($this->connectionParams['driver'] == "sqlite") {
-            throw new \Exception('SQLite database backup is not allowed. Download "'.$this->connectionParams['url'].'" file directly.');
+    public function backup($fileName = null, $action = null, $excludeTables = []) {
+        if ($this->connectionParams['driver'] == 'sqlite') {
+            throw new Exception('SQLite database backup is not allowed. Download "'.$this->connectionParams['url'].'" file directly.');
         }
-        if (empty($file)) {$file = 'SunDB-Backup-'.date("dmYHis").'.sql';} else {$file .= '.sql';} // define file name
-        if (empty($type)) {$type = 'save';} // default value for $type
-        if ($type == 'save') { // if selected the Save method
-            header('Content-disposition: attachment; filename='.$file);
+        if (empty($fileName)) {$fileName = 'SunDB-Backup-'.date("dmYHis").'.sql';} else {$fileName .= '.sql';} // define file name
+        if (empty($action)) {$action = 'save';} // default action
+        if ($action == 'save') { // if selected the Save method
+            header('Content-disposition: attachment; filename='.$fileName);
             header('Content-type: application/force-download'); // header for download
         }
-        $show = $this->pdo()->query("show tables")->fetchAll(); // list all tables
+        $show = $this->pdo()->query('show tables')->fetchAll(); // list all tables
         $tables = [];
         foreach ($show as $rows) {
             $content = [];
             $table = reset($rows);
-            $create = $this->pdo()->query("show create table `$table`")->fetchAll(); // list table structures
-            $content[] = $create[0]['Create Table'].";\n"; // select Create Table structure
-            $query = $this->pdo()->prepare("select * from `$table`"); // list all values in selected table
-            $query->execute(array());
-            $select = $query->fetchAll();
-            if ($query->rowCount() > 0) {
-                foreach ($select as $row) {
-                    if (count($row) < 1) {continue;}
-                    $header = "INSERT INTO `$table` VALUES ('"; // add Insert query
-                    $body = implode("', '", array_values($row)); // add listed values
-                    $footer = "');";
-                    $content[] = $header.$body.$footer;
+            if (!in_array($table, $excludeTables)) {
+                $create = $this->pdo()->query("show create table `$table`")->fetchAll(); // list table structures
+                $content[] = $create[0]['Create Table'].";\n"; // select Create Table structure
+                $query = $this->pdo()->prepare("select * from `$table`"); // list all values in selected table
+                $query->execute(array());
+                $select = $query->fetchAll();
+                if ($query->rowCount() > 0) {
+                    foreach ($select as $row) {
+                        if (count($row) < 1) {continue;}
+                        $header = "INSERT INTO `$table` VALUES ('"; // add Insert query
+                        $body = implode("', '", array_values($row)); // add listed values
+                        $footer = "');";
+                        $content[] = $header.$body.$footer;
+                    }
+                    if (count($content) < 1) {continue;}
+                    $tables[$table] = implode("\n", $content);
                 }
-                if (count($content) < 1) {continue;}
-                $tables[$table] = implode("\n", $content);
             }
         }
-        if ($type == 'save') {
-            echo "# SunDB Database Backup File\n# Backup Date: ".date("Y-m-d H:i:s")."\n# Backup File: ".$file."\n\n\n";
+        if ($action == 'save') {
+            echo "# SunDB Database Backup File\n# Backup Date: ".date("Y-m-d H:i:s")."\n# Backup File: ".$fileName."\n\n\n";
             echo implode("\n\n", array_values($tables));
         } else { // if selected the Show method
-            echo nl2br(implode("<br><br>", array_values($tables)));
+            echo nl2br(implode('<br><br>', array_values($tables)));
         }
+    }
+
+    /**
+     * Analyze, check, optimize and repair tables
+     * 
+     * @throws exception
+     * @return boolean
+     */
+    public function maintenance() {
+        $tables = [];
+        $show = $this->pdo()->query('show tables')->fetchAll(); // list tables
+        foreach ($show as $rows) {
+            if (!is_array($rows)) continue;
+            if (count($rows) < 1) continue;
+            $tables[] = '`' . $this->connectionParams['dbname'] . '`.' . '`' . reset($rows) . '`';
+        }
+        if (count($tables) > 0) {
+            $tables = implode(', ', $tables);
+            try {
+                $analyze = $this->pdo()->query("analyze table $tables"); // analyze tables
+                $check = $this->pdo()->query("check table $tables"); // check tables
+                $optimize = $this->pdo()->query("optimize table $tables"); // optimize tables
+                $repair = $this->pdo()->query("repair table $tables"); // repair tables
+            } catch (Exception $e) {
+                throw new Exception($e->getMessage());
+            }
+            if ($analyze && $check && $optimize && $repair) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Return a static instance of connection
+     *
+     * @return object
+     */
+    public static function getInstance() {
+        return self::$instance;
     }
 
     /**
@@ -649,7 +1149,24 @@ class SunDB
         if (empty($this->query)) {
             echo '<b>[SunDB] Error:</b> SQL query not found.';
         } else {
-            echo '<p><b>[SunDB] Query:</b> '.$this->query.'</p>';
+            if ($this->action == 'query') {
+                echo '<p><b>[SunDB] Query:</b> ' . $this->query . '</p>';
+            } else {
+                if ($this->action == 'insert') {
+                    $displayValues = $this->values; // no where clause on insert
+                } else if ($this->action == 'update') {
+                    $displayValues = array_merge($this->values, $this->whereValues); // set values, then where values
+                } else {
+                    $displayValues = $this->whereValues; // select/delete
+                }
+                $queryArray = explode('?', $this->query);
+                $result = '';
+                for ($i = 0; $i < count($queryArray)-1; $i++) {
+                    $result .= $queryArray[$i] . "'" . $displayValues[$i] . "'";
+                }
+                $result .= $queryArray[count($queryArray)-1];
+                echo '<p><b>[SunDB] Query:</b> ' . $result . '</p>';
+            }
         }
     }
 
@@ -657,20 +1174,21 @@ class SunDB
      * Return the total record count in a table
      *
      * @param string $table
-     * @return int
+     * @return integer
      */
     public function tableCount($table = null) {
-        if ($this->connectionParams['driver'] != "sqlite" && $this->checkTable) {
+        $table = $this->validateIdentifier($table);
+        if ($this->connectionParams['driver'] != 'sqlite' && $this->checkTable) {
             $this->checkTable($table);
         }
-        $query = $this->pdo()->query('select count(*) as total from '.$table)->fetchAll();
-        return (int) $query[0]["total"];
+        $query = $this->pdo()->query('select count(*) as total from `' . $table . '`')->fetchAll();
+        return (int) $query[0]['total'];
     }
 
     /**
      * Return the number of affected rows
      *
-     * @return int
+     * @return integer
      */
     public function rowCount(){
         return (int) $this->rowCount;
@@ -679,7 +1197,7 @@ class SunDB
     /**
      * Return the value of the auto increment column
      *
-     * @return int
+     * @return integer
      */
     public function lastInsertId() {
         return (int) $this->lastInsertId;
@@ -695,7 +1213,7 @@ class SunDB
      */
     public function func($func = null, $param = null) {
         if (empty($func) || empty($param)) {
-            throw new \Exception('Missing parameters for "'.$func.'" function.');
+            throw new Exception('Missing parameters for "' . $func . '" function.');
         }
         return $func($param);
     }

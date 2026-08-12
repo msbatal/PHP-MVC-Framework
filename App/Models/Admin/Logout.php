@@ -10,27 +10,23 @@
 
 /**
  * Namespace for model
- * Use App/Models directory
+ * Use App/Models/Admin directory
  */
-namespace App\Models;
+namespace App\Models\Admin;
 
 /**
  * Inherit from the main model
  * Don't change parent model path and name
  */
-class Home extends \Core\Model
+class Logout extends \Core\Model
 {
 
     /**
      * Main method of the model
      * Don't change the method's name
-     * If this page is called by the controller without a method parameter,
-     * this runs first - currently unused, no DB work needed for the
-     * placeholder homepage. Add methods here as the real page grows, and
-     * call them from Home::show() before the require_once() (see
-     * App/Controllers/README.md).
      */
     public function show() {
+        // no direct db work here - Admin\Logout controller uses $GLOBALS['auth'] (SunAuth) directly
     }
 
 }

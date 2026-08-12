@@ -3,10 +3,9 @@
 /**
  * This file is part of the Sunhill Framework package.
  *
- * (c) Mehmet Selcuk Batal, Sunhill Technology <batalms@gmail.com>
+ * (c) Sunhill Technology <info@sunhillint.com>
  *
- * Licensed under The GNU Lesser General Public License, version 3.0
- * Redistributions of files must retain the above copyright notice.
+ * Licensed under The GNU Lesser General Public License, version 3.0. Redistributions of files must retain the above copyright notice.
  */
 
 /**

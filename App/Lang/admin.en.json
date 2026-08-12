@@ -1,0 +1,22 @@
+{
+  "admin.meta.title": "Admin Panel",
+  "admin.email_label": "Email",
+  "admin.password_label": "Password",
+
+  "admin.login.title": "Admin Login",
+  "admin.login.error": "Invalid email or password.",
+  "admin.login.submit": "Log In",
+
+  "admin.logout.title": "Log Out",
+  "admin.logout.subtitle": "Are you sure you want to log out?",
+  "admin.logout.submit": "Log Out",
+  "admin.logout.cancel_link": "Cancel",
+
+  "admin.dashboard.title": "Dashboard",
+  "admin.dashboard.welcome": "Welcome back, %s!",
+  "admin.dashboard.welcome_generic": "Welcome back!",
+  "admin.dashboard.logout_link": "Log Out",
+
+  "admin.flash_welcome_back": "Welcome back!",
+  "admin.flash_logged_out": "You've been logged out."
+}

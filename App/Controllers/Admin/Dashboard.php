@@ -10,21 +10,31 @@
 
 /**
  * Namespace for controller
- * Use App/Controllers directory
+ * Use App/Controllers/Admin directory
  */
-namespace App\Controllers;
+namespace App\Controllers\Admin;
 
 /**
  * Inherit from the main controller
  * Don't change parent controller path and name
+ *
+ * Placeholder admin landing page - proves the panel's routing/auth pipeline
+ * works. Gated behind login via $authRequired below (see Core/README.md's
+ * auth() section). Replace with your real admin content.
  */
-class Error extends \Core\Controller
+class Dashboard extends \Core\Controller
 {
-    
+
+    /**
+     * Methods that require an authenticated visitor (see Core\Controller::auth())
+     * @var array
+     */
+    public $authRequired = ['show'];
+
     /**
      * Construct method of the inherited controller
      * Don't change the parameters if not needed
-     * 
+     *
      * @param string $view
      * @param object $model
      * @param array $params
@@ -38,16 +48,15 @@ class Error extends \Core\Controller
     /**
      * Main method of the controller
      * Don't change the method's name
-     * If this page is called by a browser, this will work first
      */
     public function show() {
-        // Reached directly by the router (e.g. Core\App::parseUrl()'s
-        // ".php in URL" guard) rather than via Core\App::catchError(), so
-        // $errorType isn't pre-set - the view defaults it to 404, match
-        // that here for a correct HTTP status.
-        header('HTTP/1.1 404 Not Found');
         require_once ($this->view); // include view file
     }
+
+    /**
+     * Other optional methods used in URL's custom [Method Name] part
+     * Structure: .....[URL]...../Admin/Dashboard/[Method Name]/[Parameters]
+     */
 
 }
 

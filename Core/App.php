@@ -3,10 +3,9 @@
 /**
  * This file is part of the Sunhill Framework package.
  *
- * (c) Mehmet Selcuk Batal, Sunhill Technology <batalms@gmail.com>
+ * (c) Sunhill Technology <info@sunhillint.com>
  *
- * Licensed under The GNU Lesser General Public License, version 3.0
- * Redistributions of files must retain the above copyright notice.
+ * Licensed under The GNU Lesser General Public License, version 3.0. Redistributions of files must retain the above copyright notice.
  */
 
 /**
@@ -25,33 +24,50 @@ class App
      * URL parameters
      * @var array
      */
-    private $routes = [];
+    public $routes = [];
 
 
     public function __construct() {
-        if (SYS_SYSERR === true) { // if system error printing set true
-            set_exception_handler(function($exception) {
-                echo '<b>[Sunhill] Exception:</b> '.$exception->getMessage();
-            });
-        }
+        // Single, authoritative handler from this point in the boot sequence
+        // onward: any exception thrown after this line (including ones thrown
+        // deep inside System/Sun* classes, which have no local try/catch of
+        // their own) ends up here and gets the same branded error page as the
+        // classified catchError() calls below, instead of a raw dump. Does NOT
+        // cover anything thrown earlier in init.php (SunFunc::loadEnv(), a
+        // missing .env being the concrete case) - nothing does, since no
+        // handler exists yet at that point. See the root README.md's boot
+        // sequence and Core/README.md for that boundary.
+        set_exception_handler(function ($exception) {
+            $this->catchError($exception->getMessage(), 500);
+        });
     }
 
     /**
-     * Catch system errors
+     * Show the branded error page in place (same URL, correct HTTP status)
+     * and stop execution - used for both classified application errors
+     * (401/403/404/500 from Controller/Model) and any otherwise-uncaught
+     * exception (see the handler installed in the constructor above).
+     * The raw $message is only ever shown when SYS_SYSERR is true (see
+     * App/Views/Error.php) - visitors always get the friendly version.
      *
      * @param string $message
-     * @throws exception
+     * @param int $type one of 401, 403, 404, 500
      */
-    public function catchError($message = null) {
-        if (SYS_SYSERR === true) { // if system error printing set true
-            throw new \Exception($message);
-        } else { // if set false
-            if (!empty(SYS_ERRPAGE) && file_exists(SYS_BASEPATH . '/App/Controllers/' . ucfirst(SYS_ERRPAGE) . '.php')) {
-                header('Location: ' . SYS_BASEURL . '/' . SYS_ERRPAGE); // redirect to error page
-            } else {
-                header('Location: ' . SYS_BASEURL); // redirect to home page
-            }
+    public function catchError($message = null, $type = 500) {
+        if (!in_array($type, [401, 403, 404, 500], true)) {
+            $type = 500;
         }
+        $statusLines = [
+            401 => 'HTTP/1.1 401 Unauthorized',
+            403 => 'HTTP/1.1 403 Forbidden',
+            404 => 'HTTP/1.1 404 Not Found',
+            500 => 'HTTP/1.1 500 Internal Server Error',
+        ];
+        header($statusLines[$type]);
+        $errorType = $type;
+        $errorDebugMessage = $message;
+        require SYS_BASEPATH . '/App/Views/Error.php';
+        exit;
     }
 
     /**
@@ -61,18 +77,26 @@ class App
      * @return array
      */
     public function parseUrl($url = null) {
-        if (empty($url)) {$url = ucfirst(SYS_HOMEPAGE);} // set url as home page
+        if (empty($url)) {$url = SYS_DFLTLANG . '/' . SYS_HOMEPAGE;} // set url as home page
         $url = explode('/', str_replace('.php', '', rtrim($url, '/'))); // parse url
         foreach ($url as $key => $value) {
             $this->routes[$key] = ucfirst($value); // get parameters from url
         }
+        // if not exists in accepted languages
+        $hadValidLanguage = in_array(strtolower($this->routes[0]), SYS_LANGUAGES, true);
+        if (!$hadValidLanguage) {
+            $this->routes[0] = SYS_DFLTLANG; // default language
+        }
         // if page name is empty
-        if (!isset($this->routes[0]) || is_null($this->routes[0]) || $this->routes[0] == 'Index') {
-            $this->routes[0] = ucfirst(SYS_HOMEPAGE); // home page
+        if (!isset($this->routes[1]) || is_null($this->routes[1]) || $this->routes[1] == 'Index') {
+            if (!$hadValidLanguage && count($url) === 1) {
+                $this->catchError('Page not found.', 404);
+            }
+            $this->routes[1] = ucfirst(SYS_HOMEPAGE); // home page
         }
         // if page name includes php extension
-        if (strstr($this->routes[0], '.php')) {
-            $this->routes[0] = ucfirst(SYS_ERRPAGE); // error page
+        if (strstr($this->routes[1], '.php')) {
+            $this->routes[1] = ucfirst(SYS_ERRPAGE); // error page
         }
         return $this->routes;
     }
