@@ -140,7 +140,7 @@ exists, in `Core/README.md`.
 
 ## Setting up a new project from this template
 
-1. Copy `.env.example` to `.env`, fill in real `DB_*` values (and
+1. Open `.env`, fill in real `DB_*` values (and
    `SMTP_*` if you'll send email). Generate real `SYS_SCRKEY`/`SYS_SCRIV`
    values - don't ship the example placeholders.
 2. Import `database/schema.sql` into your database. Extend the `users`
