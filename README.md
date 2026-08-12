@@ -2,6 +2,10 @@
 
 Sunhill Framework is a simple, fast, and powerful PHP App Development Framework that enables you to develop more modern applications by using MVC (Model - View - Controller) pattern.
 
+`Technical Document:` https://deepwiki.com/msbatal/PHP-MVC-Framework
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/msbatal/PHP-MVC-Framework)
+
 <hr>
 
 This is a blank starting point for the Sunhill MVC framework ("SunMvc") -
