@@ -1,4 +1,8 @@
-# SunMvc - blank project template
+# PHP MVC App Development Framework
+
+Sunhill Framework is a simple, fast, and powerful PHP App Development Framework that enables you to develop more modern applications by using MVC (Model - View - Controller) pattern.
+
+<hr>
 
 This is a blank starting point for the Sunhill MVC framework ("SunMvc") -
 routing, controllers/models/views, authentication, i18n, and error
