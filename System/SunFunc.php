@@ -41,28 +41,88 @@ class SunFunc
         }
     }
 
+    /**
+     * AES-256-GCM with a fresh random IV per call (IV+tag are prepended to
+     * the ciphertext, then the whole thing base64-encoded) - the previous
+     * scheme derived a single fixed IV from SYS_SCRIV and reused it on
+     * every call, which under CTR mode let two ciphertexts be XORed
+     * together to recover the XOR of their plaintexts. GCM also adds a
+     * tag, catching tampering that CTR alone never detected.
+     */
     public function encryption($input = null) {
-        if (!is_null($input)) {
-            $method = 'AES-256-CTR';
-            $key = SYS_SCRKEY;
-            $iv = substr(hash('sha256', SYS_SCRIV), 0, 16);
-            $result = openssl_encrypt($input, $method, $key, $options=0, $iv);
-            return $result;
-        } else {
+        if (is_null($input)) {
             return false;
         }
+        $key = SYS_SCRKEY;
+        $iv = random_bytes(12);
+        $tag = '';
+        $cipher = openssl_encrypt($input, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag, '', 16);
+        if ($cipher === false) {
+            return false;
+        }
+        return base64_encode($iv . $tag . $cipher);
     }
 
+    /**
+     * Decrypts values from encryption() above. Falls back to the retired
+     * fixed-IV AES-256-CTR scheme (see migrate-encrypted-secrets.php) so
+     * any row missed by that migration still reads correctly instead of
+     * silently failing.
+     */
     public function decryption($input = null) {
-        if (!is_null($input)) {
-            $method = 'AES-256-CTR';
-            $key = SYS_SCRKEY;
-            $iv = substr(hash('sha256', SYS_SCRIV), 0, 16);
-            $result = openssl_decrypt($input, $method, $key, $options=0, $iv);
-            return $result;
-        } else {
+        if (is_null($input)) {
             return false;
         }
+        $key = SYS_SCRKEY;
+        $raw = base64_decode($input, true);
+        if ($raw !== false && strlen($raw) > 28) {
+            $iv = substr($raw, 0, 12);
+            $tag = substr($raw, 12, 16);
+            $cipher = substr($raw, 28);
+            $result = openssl_decrypt($cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+            if ($result !== false) {
+                return $result;
+            }
+        }
+        $legacyIv = substr(hash('sha256', SYS_SCRIV), 0, 16);
+        return openssl_decrypt($input, 'AES-256-CTR', $key, 0, $legacyIv);
+    }
+
+    /**
+     * Resolves $host to an IP and returns it only if that IP is public
+     * (not loopback/private/link-local/reserved) - null otherwise. Shared
+     * SSRF guard for any feature that fetches a customer-supplied URL
+     * (WebhookIntegrations, AiBotCrawler): callers should pin curl to the
+     * returned IP (CURLOPT_RESOLVE) rather than re-resolving the hostname,
+     * or a DNS answer that changes between this check and the actual
+     * connection (DNS rebinding) bypasses the check entirely.
+     *
+     * @param string $host
+     * @return string|null
+     */
+    public static function resolveSafeIp($host) {
+        $ip = filter_var($host, FILTER_VALIDATE_IP) ? $host : gethostbyname($host);
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return null;
+        }
+        return $ip;
+    }
+
+    /**
+     * Rejects anything but a plain http(s) URL whose host resolves to a
+     * public IP. See resolveSafeIp() above - callers that go on to make
+     * the actual request should call resolveSafeIp() themselves and pin
+     * to its result instead of relying on this boolean check alone.
+     *
+     * @param string $url
+     * @return bool
+     */
+    public static function isSafeUrl($url) {
+        $parts = parse_url($url);
+        if (empty($parts['scheme']) || !in_array(strtolower($parts['scheme']), ['http', 'https'], true) || empty($parts['host'])) {
+            return false;
+        }
+        return self::resolveSafeIp($parts['host']) !== null;
     }
 
     public function getIpAddress() {
