@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.2.6
+ * @version   4.2.7
  */
 
 class SunCache
@@ -355,7 +355,7 @@ class SunCache
         }
         $htaccessFile = $cacheDirPath . '/.htaccess';
         if (!file_exists($htaccessFile)) { // if htaccess file not exists
-            file_put_contents($htaccessFile, "order allow,deny\ndeny from all\nOptions All -Indexes"); // create htaccess file
+            file_put_contents($htaccessFile, "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Deny from all\n</IfModule>\nOptions All -Indexes"); // create htaccess file
         }
     }
 
