@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2025, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Authentication-Class
- * @version   1.0.1
+ * @version   1.0.2
  */
 
 class SunAuth
@@ -366,7 +366,7 @@ class SunAuth
      * Create a database backed session and store the raw token in $_SESSION
      *
      * @param integer $userId
-     * @param integer $pending 1 while waiting for 2FA verification
+     * @param integer $pending
      * @return string raw session token
      */
     private function createSession($userId = null, $pending = 0) {
@@ -384,6 +384,7 @@ class SunAuth
         ])->run();
         $_SESSION[$this->config['sessionKey']] = $token;
         $this->userCache = null;
+        $this->regenerate();
         return $token;
     }
 
