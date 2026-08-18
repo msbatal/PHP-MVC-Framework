@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.2.7
+ * @version   4.2.8
  */
 
 class SunCache
@@ -136,7 +136,7 @@ class SunCache
                     $this->willCache = false; // disable caching if file not exists
                 }
                 if (!file_exists(dirname(__FILE__) . '/' . $this->cacheDir)) {
-                    mkdir(dirname(__FILE__) . '/' . $this->cacheDir, 0777); // create directory if not exists
+                    mkdir(dirname(__FILE__) . '/' . $this->cacheDir, 0755); // create directory if not exists
                 }
                 if ($this->showTime) { // if load time will show on the bottom of the page (hidden)
                     list($time[1], $time[0]) = explode(' ', microtime());
@@ -351,7 +351,7 @@ class SunCache
     private function htaccess() {
         $cacheDirPath = dirname(__FILE__) . '/' . $this->cacheDir;
         if (!file_exists($cacheDirPath)) {
-            mkdir($cacheDirPath, 0777, true); // ensure the directory exists before writing into it
+            mkdir($cacheDirPath, 0755, true); // ensure the directory exists before writing into it
         }
         $htaccessFile = $cacheDirPath . '/.htaccess';
         if (!file_exists($htaccessFile)) { // if htaccess file not exists
