@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.3.0
+ * @version   4.3.1
  */
 
 class SunCache
@@ -130,6 +130,23 @@ class SunCache
             }
             if (!in_array(strtolower(pathinfo($_SERVER['SCRIPT_NAME'])['extension'] ?? ''), ['php', 'html'])) {
                 $this->willCache = false; // disable caching if file is not php or html
+            }
+            $redirectStatus = $_SERVER['REDIRECT_STATUS'] ?? null;
+            if ($redirectStatus !== null && $redirectStatus !== '200') {
+                $this->willCache = false; // disable caching for error-document-routed requests
+            }
+            $requestPath = strtolower((string) parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
+            $requestExtension = pathinfo($requestPath, PATHINFO_EXTENSION);
+            $nonPageExtensions = [
+                'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp', 'avif',
+                'css', 'js', 'mjs', 'map',
+                'txt', 'xml', 'json', 'csv', 'pdf',
+                'woff', 'woff2', 'ttf', 'eot', 'otf',
+                'mp4', 'mp3', 'wav', 'ogg', 'webm', 'avi', 'mov',
+                'zip', 'rar', '7z', 'gz',
+            ];
+            if ($requestExtension !== '' && in_array($requestExtension, $nonPageExtensions, true)) {
+                $this->willCache = false; // disable caching for non-page static assets
             }
             if ($this->willCache == true) { // if the active page will cache
                 if (!file_exists($_SERVER['SCRIPT_FILENAME'])) {
