@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.2.9
+ * @version   4.3.0
  */
 
 class SunCache
@@ -159,7 +159,9 @@ class SunCache
      */
     public function __destruct() {
         if ($this->cacheSystem == true && $this->willCache == true) { // if cache system enabled and page will cache
-            if ($this->cacheStatus == false) { // if page not cached before
+            $statusCode = http_response_code();
+            $isSuccess = $statusCode === false || ($statusCode >= 200 && $statusCode < 300); // only cache successful (2xx) responses
+            if ($this->cacheStatus == false && $isSuccess) { // if page not cached before
                 $content = ob_get_contents();
                 if (!empty(trim($content))) { // if content not empty
                     $this->writeCache($this->contentMinify ? $this->minify($content) : $content); // write content into the cache file
