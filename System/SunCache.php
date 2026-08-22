@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.2.8
+ * @version   4.2.9
  */
 
 class SunCache
@@ -281,6 +281,7 @@ class SunCache
             }
         }
         $replace = [
+            '/(__(?:SCRIPT|STYLE)_PLACEHOLDER_\d+__)\s+/s' => '$1',
             '/\>\s+(?=\<)/s' => '>',
             '/\>\s+(?=[^\<])/s' => '> ',
             '/([^\>])\s+\</s' => '$1 <',
