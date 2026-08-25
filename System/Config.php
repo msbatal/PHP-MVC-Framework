@@ -27,7 +27,8 @@ $cacheConfig = [
     'storageTime'   => 24*60*60, // storage time (seconds)
     'contentMinify' => true, // content minification
     'showTime'      => true, // show page load time
-    'sefUrl'        => true // website sef url status
+    'sefUrl'        => true, // website sef url status
+    'varyCookies'   => [] // Cache with cookie variants
 ];
 
 /**
