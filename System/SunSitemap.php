@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Sitemap-Generator
- * @version   2.5.4
+ * @version   2.6.0
  */
 
 class SunSitemap
@@ -32,6 +32,12 @@ class SunSitemap
      * @var string
      */
     private $robotsFile = "robots.txt";
+
+    /**
+     * Llms file name
+     * @var string
+     */
+    private $llmsFile = "llms.txt";
 
     /**
      * Sitemap base url
@@ -62,6 +68,18 @@ class SunSitemap
      * @var boolean
      */
     public $createZip = false;
+
+    /**
+     * Update/create robots.txt
+     * @var boolean
+     */
+    public $robots = false;
+
+    /**
+     * Create llms.txt
+     * @var boolean
+     */
+    public $llms = false;
 
     /**
      * Urls to add sitemap
@@ -104,8 +122,10 @@ class SunSitemap
      * @param string $relPath
      * @param integer $maxUrl
      * @param boolean $createZip
+     * @param boolean $robots
+     * @param boolean $llms
      */
-    public function __construct($baseUrl = null, $relPath = null, $maxUrl = null, $createZip = null) {
+    public function __construct($baseUrl = null, $relPath = null, $maxUrl = null, $createZip = null, $robots = null, $llms = null) {
         $this->startTime = microtime(true); // get process start time
         if (!empty($baseUrl)) {
             $this->baseUrl = $baseUrl . '/'; // set base url
@@ -127,6 +147,12 @@ class SunSitemap
         }
         if (is_bool($createZip)) {
             $this->createZip = $createZip; // create zipped copy of sitemap
+        }
+        if (is_bool($robots)) {
+            $this->robots = $robots; // update/create robots.txt
+        }
+        if (is_bool($llms)) {
+            $this->llms = $llms; // create llms.txt
         }
     }
 
@@ -263,21 +289,7 @@ class SunSitemap
     /**
      * Create/update Robots.txt file
      *
-     * Always rebuilds the file from these fixed rules plus the given
-     * $disallow list - it never reads or merges an existing robots.txt.
-     * That makes every call deterministic: the same $disallow input
-     * always produces the same output, regardless of whatever the file
-     * on disk currently contains (missing, hand-edited, or stale from a
-     * previous version of this method).
-     *
-     * Major AI answer-engine crawlers (GPTBot, ChatGPT-User, Google-
-     * Extended, CCBot, anthropic-ai, ClaudeBot, PerplexityBot, Applebot-
-     * Extended, Bytespider, meta-externalagent) are always explicitly
-     * allowed, in addition to the default "User-agent: *" block, so a
-     * site stays discoverable by both traditional search and AI-powered
-     * answer engines.
-     *
-     * @param array $disallow Paths to disallow, e.g. ['/App/', '/Core/'] - optional
+     * @param array $disallow Paths to disallow
      * @throws exception
      * @return object
      */
@@ -285,20 +297,33 @@ class SunSitemap
         if (!isset($this->sitemaps)) {
             throw new Exception('To create/update the robots.txt file, first call the "createSitemap" method.');
         }
+        if (!$this->robots) {
+            return $this; // robots.txt update disabled via constructor
+        }
         $hasDisallow = is_array($disallow) && count($disallow) > 0;
         $robotsContent = $hasDisallow ? "User-agent: *\nAllow: /\n" : "User-agent: *\nDisallow:\n";
+        if ($hasDisallow) {
+            // Disallow rules must sit directly under the "User-agent: *"
+            // record they apply to (a blank line starts a new record) -
+            // appending them after the AI-crawler blocks below would leave
+            // them structurally orphaned (not associated with any
+            // User-agent line), which crawlers are free to ignore.
+            foreach ($disallow as $path) {
+                $robotsContent .= "Disallow: " . $path . "\n";
+            }
+        }
         $aiCrawlers = [
             'GPTBot', 'ChatGPT-User', 'Google-Extended', 'CCBot', 'anthropic-ai',
-            'ClaudeBot', 'PerplexityBot', 'Applebot-Extended', 'Bytespider', 'meta-externalagent',
+            'ClaudeBot', 'PerplexityBot', 'Applebot-Extended', 'Bytespider', 'meta-externalagent', 'Perplexity-User', 'Claude-Web', 'OAI-SearchBot'
         ];
         foreach ($aiCrawlers as $crawler) {
             $robotsContent .= "\nUser-agent: " . $crawler . "\nAllow: /\n";
         }
-        if ($hasDisallow) {
-            $robotsContent .= "\n";
-            foreach ($disallow as $path) {
-                $robotsContent .= "Disallow: " . $path . "\n";
+        if ($this->llms) {
+            if (!file_exists($this->absPath . $this->llmsFile)) {
+                file_put_contents($this->absPath . $this->llmsFile, ''); // create empty llms.txt if missing
             }
+            $robotsContent .= "\n# AI context file: " . $this->baseUrl . $this->relPath . $this->llmsFile . "\n";
         }
         if (count($this->sitemapIndex) == 0) {
             $robotsContent .= "\nSitemap: " . $this->baseUrl . $this->relPath . $this->sitemapFile;
