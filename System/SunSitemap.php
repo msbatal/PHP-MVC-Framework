@@ -303,11 +303,6 @@ class SunSitemap
         $hasDisallow = is_array($disallow) && count($disallow) > 0;
         $robotsContent = $hasDisallow ? "User-agent: *\nAllow: /\n" : "User-agent: *\nDisallow:\n";
         if ($hasDisallow) {
-            // Disallow rules must sit directly under the "User-agent: *"
-            // record they apply to (a blank line starts a new record) -
-            // appending them after the AI-crawler blocks below would leave
-            // them structurally orphaned (not associated with any
-            // User-agent line), which crawlers are free to ignore.
             foreach ($disallow as $path) {
                 $robotsContent .= "Disallow: " . $path . "\n";
             }
