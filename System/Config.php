@@ -25,6 +25,7 @@ $cacheConfig = [
     'cacheDir'      => '/../Public/cache', // cache folder path
     'fileExtension' => 'html', // cache file extension
     'storageTime'   => 24*60*60, // storage time (seconds)
+    'browserMaxAge' => 60*60, // browser cache time (seconds)
     'contentMinify' => true, // content minification
     'showTime'      => true, // show page load time
     'sefUrl'        => true, // website sef url status
