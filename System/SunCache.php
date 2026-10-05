@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2020, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Cache-Class
- * @version   4.3.1
+ * @version   4.5.2
  */
 
 class SunCache
@@ -52,10 +52,22 @@ class SunCache
     private $storageTime = 24 * 60 * 60;
 
     /**
+     * Browser cache time (seconds, null = same as storage time)
+     * @var integer
+     */
+    private $browserMaxAge = null;
+
+    /**
      * Exclude files from caching (file_name.ext)
      * @var array
      */
     private $excludeFiles = [];
+
+    /**
+     * Cookie names that make the cache vary
+     * @var array
+     */
+    private $varyCookies = [];
 
     /**
      * Cache status (will cache or not)
@@ -92,6 +104,20 @@ class SunCache
      * @var boolean
      */
     private $sefUrl = false;
+
+    /**
+     * Tracking-only query string parameters to always strip from the cache key
+     * (analytics/ad click ids that never change a page's actual content).
+     * Override or extend via the settings array if a site uses others.
+     * @var array
+     */
+    private $ignoreParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'gclid', 'gclsrc', 'dclid', 'gbraid', 'wbraid', 'gad_source', 'fbclid', 'igshid', 'msclkid', 'ttclid', 'twclid', 'yclid', 'epik', 'mc_cid', 'mc_eid', '_hsenc', '_hsmi', 'ref', 'referrer', '_ga'];
+
+    /**
+     * Query string parameter allow-list for the cache key (empty = keep all except ignoreParams)
+     * @var array
+     */
+    private $queryParams = [];
 
     /**
      * @param boolean $cacheSystem
@@ -139,8 +165,7 @@ class SunCache
             $requestExtension = pathinfo($requestPath, PATHINFO_EXTENSION);
             $nonPageExtensions = [
                 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp', 'avif',
-                'css', 'js', 'mjs', 'map',
-                'txt', 'xml', 'json', 'csv', 'pdf',
+                'css', 'js', 'mjs', 'map', 'txt', 'xml', 'json', 'csv', 'pdf',
                 'woff', 'woff2', 'ttf', 'eot', 'otf',
                 'mp4', 'mp3', 'wav', 'ogg', 'webm', 'avi', 'mov',
                 'zip', 'rar', '7z', 'gz',
@@ -160,7 +185,7 @@ class SunCache
                     $this->startTime = $time[1] + $time[0];
                 }
                 list($file, $normalizedUri) = $this->normalizeUri(); // normalize the uri
-                $hash = substr(md5($normalizedUri), 0, 6); // create hash
+                $hash = substr(md5($normalizedUri . $this->varySuffix()), 0, 6); // create hash (includes vary-cookie values, if configured)
                 $this->cacheFile = dirname(__FILE__) . '/' . $this->cacheDir . '/' . $file . '_' . $hash . '.' . $this->fileExtension; // define the cache file
                 $this->readCache(); // read cached file
             }
@@ -315,13 +340,37 @@ class SunCache
             '/\)[\r\n\t ]?{[\r\n\t ]+/s' => '){',
             '/,[\r\n\t ]?{[\r\n\t ]+/s' => ',{',
             '/\),[\r\n\t ]+/s' => '), ',
-            '~([\r\n\t ])?([a-zA-Z0-9]+)="([a-zA-Z0-9_/\\-]+)"([\r\n\t ])?~s' => '$1$2=$3$4'
+            '~([a-zA-Z0-9]+)="([a-zA-Z0-9_/\\-]+)"(?=[\s>])~s' => '$1=$2'
         ];
         $content = preg_replace(array_keys($replace), array_values($replace), $content);
         foreach ($placeholders as $ph => $original) {
             $content = str_replace($ph, $original, $content); // replace placeholders with old content
         }
         return $content;
+    }
+
+    /**
+     * Build a suffix from the configured vary-cookies' current values
+     *
+     * @return string
+     */
+    private function varySuffix(): string {
+        if (empty($this->varyCookies)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($this->varyCookies as $key => $value) {
+            $isAllowList = !is_int($key);
+            $cookieName = $isAllowList ? $key : $value;
+            $cookieValue = (string) ($_COOKIE[$cookieName] ?? '');
+            if ($isAllowList && is_array($value)) {
+                $cookieValue = in_array($cookieValue, $value, true) ? $cookieValue : ''; // unknown values share one bucket
+            } else {
+                $cookieValue = substr($cookieValue, 0, 32); // generic length cap when no allow-list is given
+            }
+            $parts[] = $cookieName . '=' . $cookieValue;
+        }
+        return '|' . implode('&', $parts);
     }
 
     /**
@@ -343,17 +392,42 @@ class SunCache
         $file = implode('_', $segments); // add underscore
         $file = $file ?: 'index'; // fallback for main page
         $normalizedUri = $requestPath; // generate normalized URI
-        if ($queryString) {
-            $normalizedUri .= '?' . $queryString; // add query strings
+        $normalizedQueryString = $this->normalizeQueryString((string) $queryString);
+        if ($normalizedQueryString !== '') {
+            $normalizedUri .= '?' . $normalizedQueryString; // add normalized query string
         }
         return [$file, $normalizedUri];
+    }
+
+    /**
+     * Normalize the query string
+     *
+     * @param string $queryString
+     * @return string
+     */
+    private function normalizeQueryString($queryString): string {
+        if ($queryString === '') {
+            return '';
+        }
+        parse_str($queryString, $queryArray);
+        if (is_array($this->ignoreParams) && count($this->ignoreParams) > 0) {
+            $queryArray = array_diff_key($queryArray, array_flip($this->ignoreParams)); // strip known tracking params
+        }
+        if (is_array($this->queryParams) && count($this->queryParams) > 0) {
+            $queryArray = array_intersect_key($queryArray, array_flip($this->queryParams)); // keep only allow-listed params
+        }
+        if (empty($queryArray)) {
+            return '';
+        }
+        ksort($queryArray); // order-independent (?a=1&b=2 === ?b=2&a=1)
+        return http_build_query($queryArray);
     }
 
     /**
      * Activate browser caching
      */
     private function browserCaching() {
-        header("Cache-Control: public, max-age=".$this->storageTime.", must-revalidate"); // send cache-control header
+        header("Cache-Control: public, max-age=".(is_null($this->browserMaxAge) ? $this->storageTime : $this->browserMaxAge).", must-revalidate"); // send cache-control header
         header("Pragma: cache"); // send pragma header
         $etag = md5_file($this->cacheFile); // create and hash etag value
         $lastModified = filemtime($this->cacheFile); // get last modified time
