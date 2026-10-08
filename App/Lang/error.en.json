@@ -1,0 +1,12 @@
+{
+  "error.401.title": "Login Required",
+  "error.401.message": "You need to be logged in to view this page. Please log in to continue.",
+  "error.403.title": "Access Denied",
+  "error.403.message": "You don't have permission to view this page.",
+  "error.404.title": "Page Not Found",
+  "error.404.message": "The page you're looking for doesn't exist or may have been moved.",
+  "error.500.title": "Something Went Wrong",
+  "error.500.message": "An unexpected error occurred on our end. Please try again later.",
+  "error.home_button": "Go to Homepage",
+  "error.debug_label": "Technical details"
+}

@@ -1,0 +1,13 @@
+# Project Name (Change This!)
+
+# Description
+
+Sample Prompt: "I created a project called 'YYY' for XXX purposes. Based on this limited information, write a professional Description section for an LLMS.txt file. Explain the project's main objective, the problem it aims to solve, its target audience, and the general value it provides. Keep the text concise, technically clear, and suitable for developers and AI systems."
+
+## Overview
+
+Sample Prompt: "I created a project named 'YYY' for XXX purposes. Generate an Overview section for its LLMS.txt file. Summarize how the project works at a high level, what kind of system or workflow it may include, possible use cases, and the environment in which it operates. Use neutral, adaptable, and professional technical language."
+
+## Key facts
+
+Sample Prompt: "I created a project called 'YYY' for XXX purposes. Produce a Key Facts section for its LLMS.txt file using concise bullet points. Include broadly applicable details such as project goals, supported environments, possible technologies, integrations, scalability considerations, deployment style, and security-related assumptions. Keep the content realistic and technically credible."

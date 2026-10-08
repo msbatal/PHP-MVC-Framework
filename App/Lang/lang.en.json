@@ -1,0 +1,9 @@
+{
+  "meta.title": "My App",
+  "nav.home": "Home",
+  "nav.login": "Log In",
+  "nav.register": "Sign Up",
+  "nav.logout": "Log Out",
+  "home.title": "It works!",
+  "home.subtitle": "This is the blank SunMvc template's placeholder homepage - replace App/Views/Home.php with your real landing page."
+}
