@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2025, Sunhill Technology <www.sunhillint.com>
  * @license   https://opensource.org/licenses/lgpl-3.0.html The GNU Lesser General Public License, version 3.0
  * @link      https://github.com/msbatal/PHP-Authentication-Class
- * @version   1.0.2
+ * @version   1.1.0
  */
 
 class SunAuth
@@ -44,6 +44,8 @@ class SunAuth
         'identifier'       => 'email',        // column used to log in with
         'activeStatus'     => 1,              // value of "status" column for an active account
         'prefix'           => 'sun_',         // prefix for the support tables
+        'charset'          => 'utf8mb4',      // support table charset used by install()
+        'collation'        => '',             // support table collation used by install() (empty = server default)
         'sessionLifetime'  => 7200,           // active session lifetime (seconds)
         'rememberLifetime' => 1209600,        // remember-me lifetime (14 days)
         'resetLifetime'    => 3600,           // password reset token lifetime (seconds)
@@ -224,6 +226,69 @@ class SunAuth
      */
     public function lastError() {
         return $this->lastError;
+    }
+
+    /**
+     * Create the support tables (sessions, login attempts, remember tokens, password resets) if they do not exist
+     * (safe to run repeatedly; your own user table is not created here)
+     *
+     * @throws exception
+     * @return boolean
+     */
+    public function install() {
+        $suffix = ' ENGINE=InnoDB DEFAULT CHARSET=' . preg_replace('/[^a-z0-9_]/i', '', $this->config['charset']);
+        if ($this->config['collation'] !== '') {
+            $suffix .= ' COLLATE=' . preg_replace('/[^a-z0-9_]/i', '', $this->config['collation']);
+        }
+        $sessions = $this->validateIdentifier($this->tbl('sessions'));
+        $this->db->rawQuery('CREATE TABLE IF NOT EXISTS `' . $sessions . '` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `user_id` int unsigned NOT NULL,
+            `token_hash` char(64) NOT NULL,
+            `ip` varchar(45) DEFAULT NULL,
+            `user_agent` varchar(255) DEFAULT NULL,
+            `twofa_pending` tinyint(1) NOT NULL DEFAULT 0,
+            `created_at` datetime NOT NULL,
+            `last_activity` datetime NOT NULL,
+            `expires_at` datetime NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `token_hash` (`token_hash`),
+            KEY `user_id` (`user_id`)
+        )' . $suffix)->run();
+        $attempts = $this->validateIdentifier($this->tbl('login_attempts'));
+        $this->db->rawQuery('CREATE TABLE IF NOT EXISTS `' . $attempts . '` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `identifier` varchar(190) NOT NULL,
+            `ip` varchar(45) NOT NULL,
+            `attempts` int unsigned NOT NULL DEFAULT 0,
+            `last_attempt` datetime NOT NULL,
+            `locked_until` datetime DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            KEY `identifier` (`identifier`, `ip`)
+        )' . $suffix)->run();
+        $tokens = $this->validateIdentifier($this->tbl('remember_tokens'));
+        $this->db->rawQuery('CREATE TABLE IF NOT EXISTS `' . $tokens . '` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `user_id` int unsigned NOT NULL,
+            `selector` char(16) NOT NULL,
+            `validator_hash` char(64) NOT NULL,
+            `expires_at` datetime NOT NULL,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `selector` (`selector`),
+            KEY `user_id` (`user_id`)
+        )' . $suffix)->run();
+        $resets = $this->validateIdentifier($this->tbl('password_resets'));
+        $this->db->rawQuery('CREATE TABLE IF NOT EXISTS `' . $resets . '` (
+            `id` int unsigned NOT NULL AUTO_INCREMENT,
+            `user_id` int unsigned NOT NULL,
+            `token_hash` char(64) NOT NULL,
+            `expires_at` datetime NOT NULL,
+            `used` tinyint(1) NOT NULL DEFAULT 0,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `token_hash` (`token_hash`),
+            KEY `user_id` (`user_id`)
+        )' . $suffix)->run();
+        return true;
     }
 
     /**
