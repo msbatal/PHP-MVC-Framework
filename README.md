@@ -31,7 +31,7 @@ Together they cover:
 - **`Core/`** - the dispatch engine (`\Core\App`, `\Core\Controller`,
   `\Core\Model`). You will almost never edit these.
 - **`System/`** - framework config (`Config.php`, `Functions.php`) plus
-  11 general-purpose `Sun*.php` classes (auth, DB, mail, i18n, ...) that
+  11 general-purpose `Sun*.php` classes (auth, DB, mail, i18n, analytics, ...) that
   are maintained *outside* this project and must never be hand-edited -
   `System/README.md` explains why and what to do instead.
 - **`App/`** - where your actual project lives: `Controllers/`,
@@ -46,8 +46,8 @@ Together they cover:
 - **`Public/`** - the only directory served as static files. Its
   `Admin/` subfolder is the panel's own CSS/JS/images/fonts, kept apart
   from the front end's (`Public/Admin/README.md`).
-- **`database/`** - `schema.sql` for the tables `SunAuth` and the auth
-  flow expect.
+- **`database/`** - `schema.sql` for the tables `SunAuth`, the auth
+  flow and `SunAnalytics` expect.
 
 **Stay inside this template's structure and conventions** - the whole
 point of building on it is consistency across projects. If a task seems
@@ -63,13 +63,13 @@ Browser request
   → init.php: loads .env, requires Config.php (constants + autoloader)
               and Functions.php (_t/_e/_c/...), then constructs, in
               order: $sunApp, $functions, $filter, $captcha,
-              $authDb, $auth, ($sunApp->parseUrl() - NOW routes[] exists),
+              $authDb, $auth, $analytics, ($sunApp->parseUrl() - NOW routes[] exists),
               $local, $call (\Core\Controller - this is where your
               controller/model/view actually run)
   → \Core\Controller: check() controller/model/view files+classes+method
-                       exist → auth() gate if $authRequired → cache()
-                       if enabled → csrf() on POST → call() instantiate
-                       + dispatch
+                       exist → auth() gate if $authRequired → track()
+                       visit (SunAnalytics) → cache() if enabled → csrf()
+                       on POST → call() instantiate + dispatch
   → Your controller method runs, requires its view
 ```
 
@@ -113,6 +113,7 @@ anything:
 |---|---|---|
 | `$GLOBALS['sunApp']` | `\Core\App` | `->routes`, `->catchError(...)` |
 | `$GLOBALS['auth']` | `SunAuth` | `->isLoggedIn()`, `->login(...)`, `->user()`, ... |
+| `$GLOBALS['analytics']` | `SunAnalytics` | `->summary()`, `->sources()`, `->breakdown()`, `->pages()`, `->online()` - visits are recorded automatically |
 | `$GLOBALS['filter']` | `SunFilter` | `->sanitize(...)->result()`, `->validate(...)->result()` |
 | `$GLOBALS['functions']` | `SunFunc` | `->csrfToken()`, `->getIpAddress()`, ... |
 | `$GLOBALS['local']` | `SunLocal` | backs `_t()`/`_tr()` - rarely used directly |
@@ -144,7 +145,10 @@ exists, in `Core/README.md`.
    `SMTP_*` if you'll send email). Generate real `SYS_SCRKEY`/`SYS_SCRIV`
    values - don't ship the example placeholders.
 2. Import `database/schema.sql` into your database. Extend the `users`
-   table with your own columns as needed (`database/README.md`).
+   table with your own columns as needed (`database/README.md`). It
+   also creates the `SunAnalytics` tables (`sun_visits`, `sun_pageviews`,
+   `sun_online`); set `SYS_ANALYTICS` to `false` in `System/Config.php`
+   if the project should not record visits.
 3. Decide `SYS_LANGUAGES` in `System/Config.php` - defaults to just
    `['en']`. Add a language only once you have a matching
    `App/Lang/lang.{code}.json` (`App/Lang/README.md` - skipping this
@@ -164,7 +168,8 @@ exists, in `Core/README.md`.
    `App/Views/README.md`.
 7. The admin panel (`/en/Admin/Login`, `/en/Admin/Dashboard`) works out
    of the box against the same `users` table - log in with any account
-   from step 2. Add `public $authRole = 'admin';` to
+   from step 2. Its dashboard already shows the last 30 days of visit
+   statistics (`SunAnalytics`, `System/README.md`). Add `public $authRole = 'admin';` to
    `App/Controllers/Admin/Dashboard.php` once your `users` table
    distinguishes admins from regular visitors, and add more admin pages
    following `App/Controllers/Admin/README.md`.
@@ -223,6 +228,13 @@ cache subfolder) specifically.
 - `index.php` guards against `apache_get_modules()` being undefined
   under PHP-FastCGI/PHP-CGI SAPIs (it only exists under `mod_php`) - a
   real bug on at least one MAMP setup, fatal without the guard.
+- `SunAnalytics` sets no cookie of its own and stores no raw IP address
+  (only a visitor hash that changes every day, derived from `.env`'s
+  `SYS_SCRKEY`; `$analyticsConfig['storeIp']` is `false`), and only the
+  referrer's host is kept, never the full referrer URL. Whether a
+  consent banner is still needed depends on your jurisdiction - turn it
+  off with `SYS_ANALYTICS = false` if the project needs a different
+  approach (`System/README.md`).
 - Set `SYS_PHPERR=false` and `SYS_SYSERR=false` in production `.env` -
   both default to whatever `.env` says, and both leak internal detail to
   visitors when true (raw PHP warnings, and a technical-details box on
